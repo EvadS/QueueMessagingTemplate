@@ -1,8 +1,9 @@
 package com.example.controller;
 
 
-import com.example.model.Person;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.entity.Person;
+import com.example.model.PersonRequest;
+import com.example.repository.PersonRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,28 +20,42 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @EnableSqs
 @RestController("/persons")
+@AllArgsConstructor
 public class PersonController {
 
     static final String QUEUE_NAME = "https://sqs.us-east-2.amazonaws.com/484959649436/DevelopesQueue";
 
-    @Autowired
-    private QueueMessagingTemplate messagingTemplate;
-
+    private final QueueMessagingTemplate messagingTemplate;
+    private final PersonRepository repository;
 
     @PostMapping("/person")
-    public ResponseEntity save(@RequestBody Person requestDto){
+    public ResponseEntity save(@RequestBody PersonRequest personRequest){
 
-        messagingTemplate.convertAndSend(
-                QUEUE_NAME,new Person("John", "Doe"));
+        messagingTemplate.convertAndSend(QUEUE_NAME,personRequest);
        return ResponseEntity.ok().build();
     }
 
 
+    /**
+     * it just for test
+     * this method might be on different project
+     * @param personRequest
+     * @param senderId
+     * @throws Exception
+     */
     @SqsListener(value = QUEUE_NAME, deletionPolicy = SqsMessageDeletionPolicy.NEVER)
-    public void process( final  Person person, @Header("SenderId") String senderId) throws Exception {
-        log.info("---  Received message: {}, having SenderId: {}", person, senderId);
+    public void process(final PersonRequest personRequest, @Header("SenderId") String senderId) throws Exception {
+        log.info("---  Received message: {}, having SenderId: {}", personRequest, senderId);
 
-        int a ;
+        Person person = new Person();
+        person.setLname(personRequest.getLname());
+        person.setName(personRequest.getName());
+
+        repository.save(person);
+
+        log.info("->  Stored to data base : {}" , person);
+
+
 
 //        @SqsListener(value = "${sqs.queueNames.point}")
 //        public void receive(String message, @Header("SenderId") String senderId) throws IOException {
